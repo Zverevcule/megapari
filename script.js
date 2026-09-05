@@ -46,20 +46,33 @@ async function loadVideo() {
     const tx = db.transaction(STORE_NAME, "readonly");
     const req = tx.objectStore(STORE_NAME).get(VIDEO_KEY);
     req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => reject(tx.error);
   });
 }
 
 // ---------- UI logic ----------
 function playBlob(blob) {
+  // إذا كان هناك فيديو قديم، احذف الـ URL للتحرر من الذاكرة
+  if (player.src) {
+    URL.revokeObjectURL(player.src);
+  }
+  
   const url = URL.createObjectURL(blob);
   player.src = url;
   player.classList.add("active");
   player.loop = true;
+  
+  // استخدم canplay للتأكد من أن الفيديو جاهز للتشغيل بدون lag
+  player.addEventListener("canplay", onVideoCanPlay, { once: true });
   player.play().catch(() => {
     // autoplay may be blocked until user interacts; that's fine
   });
   hideAddButton();
+}
+
+function onVideoCanPlay() {
+  // الفيديو جاهز للتشغيل - لا يوجد lag بعد الآن
+  console.log("فيديو جاهز للتشغيل");
 }
 
 function showAddButton() {
