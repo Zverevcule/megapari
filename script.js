@@ -106,6 +106,10 @@ fileInput.addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   await saveVideo(file);
+  
+  // استنتاج لمدة ثانيتين قبل التشغيل
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
   playBlob(file);
   fileInput.value = "";
 });
