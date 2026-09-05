@@ -51,7 +51,7 @@ async function loadVideo() {
 }
 
 // ---------- UI logic ----------
-function playBlob(blob) {
+async function playBlob(blob) {
   // إذا كان هناك فيديو قديم، احذف الـ URL للتحرر من الذاكرة
   if (player.src) {
     URL.revokeObjectURL(player.src);
@@ -62,17 +62,24 @@ function playBlob(blob) {
   player.classList.add("active");
   player.loop = true;
   
-  // استخدم canplay للتأكد من أن الفيديو جاهز للتشغيل بدون lag
-  player.addEventListener("canplay", onVideoCanPlay, { once: true });
-  player.play().catch(() => {
-    // autoplay may be blocked until user interacts; that's fine
+  // انتظر حتى يكون الفيديو جاهزاً قبل التشغيل لتجنب التأخير
+  return new Promise((resolve) => {
+    const onCanPlay = () => {
+      player.removeEventListener("canplay", onCanPlay);
+      player.play().catch(() => {
+        // autoplay قد يكون محجوب من المتصفح
+      });
+      console.log("فيديو جاهز للتشغيل");
+      resolve();
+    };
+    
+    // إذا كان الفيديو جاهزاً بالفعل (readyState >= 2 = HAVE_CURRENT_DATA)
+    if (player.readyState >= 2) {
+      onCanPlay();
+    } else {
+      player.addEventListener("canplay", onCanPlay, { once: true });
+    }
   });
-  hideAddButton();
-}
-
-function onVideoCanPlay() {
-  // الفيديو جاهز للتشغيل - لا يوجد lag بعد الآن
-  console.log("فيديو جاهز للتشغيل");
 }
 
 function showAddButton() {
@@ -86,9 +93,11 @@ function showAddButton() {
 function hideAddButton() {
   controls.classList.add("hidden");
 }
+
 addBtn.addEventListener("click", () => {
   fileInput.click();
 });
+
 deleteBtn.addEventListener("click", async () => {
   await deleteVideoFromDB();
   player.pause();
@@ -107,10 +116,7 @@ fileInput.addEventListener("change", async (e) => {
   if (!file) return;
   await saveVideo(file);
   
-  // استنتاج لمدة ثانيتين قبل التشغيل
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  playBlob(file);
+  await playBlob(file);
   fileInput.value = "";
 });
 
@@ -129,7 +135,7 @@ player.addEventListener("click", () => {
   try {
     const existing = await loadVideo();
     if (existing) {
-      playBlob(existing);
+      await playBlob(existing);
     } else {
       showAddButton();
     }
