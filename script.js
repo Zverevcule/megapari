@@ -30,6 +30,7 @@ async function saveVideo(blob) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
 async function deleteVideoFromDB() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -51,7 +52,7 @@ async function loadVideo() {
 }
 
 // ---------- UI logic ----------
-async function playBlob(blob) {
+function playBlob(blob) {
   // إذا كان هناك فيديو قديم، احذف الـ URL للتحرر من الذاكرة
   if (player.src) {
     URL.revokeObjectURL(player.src);
@@ -62,24 +63,12 @@ async function playBlob(blob) {
   player.classList.add("active");
   player.loop = true;
   
-  // انتظر حتى يكون الفيديو جاهزاً قبل التشغيل لتجنب التأخير
-  return new Promise((resolve) => {
-    const onCanPlay = () => {
-      player.removeEventListener("canplay", onCanPlay);
-      player.play().catch(() => {
-        // autoplay قد يكون محجوب من المتصفح
-      });
-      console.log("فيديو جاهز للتشغيل");
-      resolve();
-    };
-    
-    // إذا كان الفيديو جاهزاً بالفعل (readyState >= 2 = HAVE_CURRENT_DATA)
-    if (player.readyState >= 2) {
-      onCanPlay();
-    } else {
-      player.addEventListener("canplay", onCanPlay, { once: true });
-    }
+  // شغل الفيديو مباشرة بدون انتظار
+  player.play().catch(() => {
+    // autoplay قد يكون محجوب من المتصفح
   });
+  
+  hideAddButton();
 }
 
 function showAddButton() {
@@ -116,7 +105,7 @@ fileInput.addEventListener("change", async (e) => {
   if (!file) return;
   await saveVideo(file);
   
-  await playBlob(file);
+  playBlob(file);
   fileInput.value = "";
 });
 
@@ -135,7 +124,7 @@ player.addEventListener("click", () => {
   try {
     const existing = await loadVideo();
     if (existing) {
-      await playBlob(existing);
+      playBlob(existing);
     } else {
       showAddButton();
     }
