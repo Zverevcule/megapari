@@ -1,71 +1,26 @@
-const DB_NAME = "videoAppDB";
-const STORE_NAME = "videos";
-const VIDEO_KEY = "currentVideo";
-
 const player = document.getElementById("player");
 const controls = document.getElementById("controls");
 const addBtn = document.getElementById("addBtn");
 const deleteBtn = document.getElementById("deleteBtn");
 const fileInput = document.getElementById("fileInput");
 let hideTimer = null;
-
-// ---------- IndexedDB helpers ----------
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      req.result.createObjectStore(STORE_NAME);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function saveVideo(blob) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    tx.objectStore(STORE_NAME).put(blob, VIDEO_KEY);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-async function deleteVideoFromDB() {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    tx.objectStore(STORE_NAME).delete(VIDEO_KEY);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-async function loadVideo() {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const req = tx.objectStore(STORE_NAME).get(VIDEO_KEY);
-    req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => reject(tx.error);
-  });
-}
+let currentBlobURL = null;
 
 // ---------- UI logic ----------
 function playBlob(blob) {
-  // إذا كان هناك فيديو قديم، احذف الـ URL للتحرر من الذاكرة
-  if (player.src) {
-    URL.revokeObjectURL(player.src);
+  // تنظيف الـ URL القديم
+  if (currentBlobURL) {
+    URL.revokeObjectURL(currentBlobURL);
   }
   
-  const url = URL.createObjectURL(blob);
-  player.src = url;
+  currentBlobURL = URL.createObjectURL(blob);
+  player.src = currentBlobURL;
   player.classList.add("active");
   player.loop = true;
   
-  // شغل الفيديو مباشرة بدون انتظار
+  // شغل الفيديو مباشرة
   player.play().catch(() => {
-    // autoplay قد يكون محجوب من المتصفح
+    console.log("Autoplay blocked by browser");
   });
   
   hideAddButton();
@@ -87,11 +42,11 @@ addBtn.addEventListener("click", () => {
   fileInput.click();
 });
 
-deleteBtn.addEventListener("click", async () => {
-  await deleteVideoFromDB();
+deleteBtn.addEventListener("click", () => {
   player.pause();
-  if (player.src) {
-    URL.revokeObjectURL(player.src);
+  if (currentBlobURL) {
+    URL.revokeObjectURL(currentBlobURL);
+    currentBlobURL = null;
   }
   player.removeAttribute("src");
   player.load();
@@ -100,17 +55,16 @@ deleteBtn.addEventListener("click", async () => {
   showAddButton();
 });
 
-fileInput.addEventListener("change", async (e) => {
+// معالج تغيير الملف - بدون حفظ في IndexedDB
+fileInput.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  await saveVideo(file);
   
   playBlob(file);
   fileInput.value = "";
 });
 
-// tap on the video briefly reveals the add button so the user
-// can swap the video later without the app looking like a player
+// التحكم في ظهور الأزرار
 player.addEventListener("click", () => {
   if (controls.classList.contains("hidden")) {
     showAddButton();
@@ -119,21 +73,14 @@ player.addEventListener("click", () => {
   }
 });
 
-// ---------- init ----------
-(async () => {
-  try {
-    const existing = await loadVideo();
-    if (existing) {
-      playBlob(existing);
-    } else {
-      showAddButton();
-    }
-  } catch (err) {
-    showAddButton();
-  }
-})();
+// إظهار الأزرار عند اللمس
+player.addEventListener("mousemove", showAddButton);
+player.addEventListener("touchstart", showAddButton);
 
-// register service worker for offline / installability
+// عند فتح الصفحة للمرة الأولى
+showAddButton();
+
+// تسجيل service worker للتثبيت والعمل بلا إنترنت
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("service-worker.js").catch(() => {});
