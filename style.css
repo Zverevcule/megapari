@@ -32,6 +32,10 @@ html, body {
   object-fit: cover;
   background: #000;
   display: none;
+  /* تحسينات الأداء */
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
 }
 
 #player.active {
@@ -42,6 +46,8 @@ html, body {
   display: flex;
   gap: 16px;
   transition: opacity .25s ease;
+  position: relative;
+  z-index: 10;
 }
 
 #controls.hidden {
@@ -60,6 +66,9 @@ html, body {
   padding: 40px 34px;
   cursor: pointer;
   transition: transform .2s ease, opacity .2s ease;
+  border: none;
+  background: transparent;
+  will-change: transform;
 }
 
 #addBtn:active, #deleteBtn:active {
@@ -96,5 +105,4 @@ html, body {
 
 #deleteBtn .label {
   font-size: 13px;
-}
 }
